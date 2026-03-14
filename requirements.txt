@@ -1,0 +1,23 @@
+# Face Mask Detection System — Requirements
+# Install all: pip install -r requirements.txt
+
+# ── Deep Learning ─────────────────────────────────────────────
+tensorflow==2
+opencv-python
+numpy
+scikit-learn
+matplotlib
+seaborn
+Pillow
+
+# ── Web App ───────────────────────────────────────────────────
+Flask
+Werkzeug
+
+# ── Web Scraping ──────────────────────────────────────────────
+requests
+beautifulsoup4
+selenium
+webdriver-manager
+tqdm
+lxml          # faster HTML parser for BeautifulSoup

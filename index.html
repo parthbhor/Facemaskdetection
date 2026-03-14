@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Face Mask Detection System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #fafaf8;
+    --surface:    #ffffff;
+    --border:     #e8e4df;
+    --border-2:   #d4cfc8;
+    --accent:     #2563eb;
+    --accent-lt:  #eff6ff;
+    --safe:       #059669;
+    --safe-lt:    #ecfdf5;
+    --safe-bd:    #a7f3d0;
+    --danger:     #dc2626;
+    --danger-lt:  #fef2f2;
+    --danger-bd:  #fca5a5;
+    --warn:       #d97706;
+    --text:       #1c1917;
+    --text-2:     #57534e;
+    --muted:      #a8a29e;
+    --mono:       'IBM Plex Mono', monospace;
+    --sans:       'Plus Jakarta Sans', sans-serif;
+    --r:          12px;
+    --r-lg:       18px;
+    --sh:         0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --sh-md:      0 4px 16px rgba(0,0,0,.08);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: var(--sh);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 1rem; color: var(--text);
+  }
+  .brand-pill {
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    text-transform: uppercase;
+  }
+  .model-chip {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 5px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .pulse {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--warn);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  .pulse.on  { background: var(--safe); }
+  .pulse.off { background: var(--danger); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.85)} }
+
+  /* ── PAGE LAYOUT ── */
+  .page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 36px 24px 60px;
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 760px) { .page { grid-template-columns: 1fr; } }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh);
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .ch-icon {
+    width: 34px; height: 34px;
+    background: var(--accent-lt);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+  .ch-title { font-size: .95rem; font-weight: 700; }
+  .ch-sub   { font-size: .75rem; color: var(--text-2); margin-top: 1px; }
+  .card-body { padding: 22px; }
+
+  /* ── UPLOAD ZONE ── */
+  .drop-zone {
+    position: relative;
+    border: 2px dashed var(--border-2);
+    border-radius: var(--r);
+    background: var(--bg);
+    padding: 46px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .22s ease;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent);
+    background: var(--accent-lt);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+  .dz-icon { font-size: 40px; display: block; margin-bottom: 12px; }
+  .dz-title { font-size: .95rem; font-weight: 600; margin-bottom: 5px; }
+  .dz-sub   { font-size: .8rem; color: var(--muted); }
+
+  /* preview */
+  .preview-box {
+    display: none;
+    margin-top: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    position: relative;
+  }
+  .preview-box img {
+    width: 100%; display: block;
+    max-height: 230px; object-fit: cover;
+  }
+  .prev-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.35);
+    display: flex; align-items: flex-start;
+    justify-content: flex-end;
+    padding: 10px;
+    opacity: 0; transition: opacity .2s;
+  }
+  .preview-box:hover .prev-overlay { opacity: 1; }
+  .clear-btn {
+    background: rgba(255,255,255,.92);
+    border: none; border-radius: 6px;
+    padding: 5px 11px;
+    font-size: 12px; font-family: var(--sans); font-weight: 600;
+    cursor: pointer; color: var(--danger);
+  }
+
+  /* info badges */
+  .info-row {
+    display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+  }
+  .info-badge {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--mono);
+    font-size: 11px; color: var(--text-2);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .info-badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    width: 100%; padding: 13px;
+    border: none; border-radius: var(--r);
+    font-family: var(--sans);
+    font-size: .9rem; font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all .18s;
+    margin-top: 14px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(37,99,235,.3);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-2);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover:not(:disabled) { background: var(--bg); border-color: var(--border-2); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+  /* ── SPINNER ── */
+  .spin-box {
+    display: none; text-align: center;
+    padding: 32px; color: var(--muted);
+    font-size: .8rem; font-family: var(--mono);
+  }
+  .spin-box.on { display: block; }
+  .spinner {
+    width: 30px; height: 30px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .65s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── ERROR ── */
+  .err-box {
+    display: none;
+    background: var(--danger-lt);
+    border: 1px solid var(--danger-bd);
+    border-radius: 8px;
+    padding: 11px 15px;
+    font-family: var(--mono); font-size: 12px;
+    color: var(--danger); margin-top: 12px;
+  }
+  .err-box.on { display: block; }
+
+  /* ── RESULT PANEL ── */
+  .placeholder {
+    text-align: center;
+    padding: 56px 24px;
+    color: var(--muted);
+  }
+  .ph-icon { font-size: 44px; margin-bottom: 14px; }
+  .ph-title { font-weight: 600; font-size: .95rem; color: var(--text-2); margin-bottom: 5px; }
+  .ph-sub   { font-size: .8rem; }
+
+  .result-box {
+    display: none;
+    animation: up .38s ease;
+  }
+  .result-box.on { display: block; }
+  @keyframes up { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  /* verdict */
+  .verdict {
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 20px;
+  }
+  .verdict.safe   { background: var(--safe-lt);   border: 1px solid var(--safe-bd); }
+  .verdict.danger { background: var(--danger-lt);  border: 1px solid var(--danger-bd); }
+  .vd-icon  { font-size: 34px; flex-shrink: 0; }
+  .vd-label {
+    font-size: 1.25rem; font-weight: 800; line-height: 1.1;
+    letter-spacing: -.2px;
+  }
+  .verdict.safe   .vd-label { color: var(--safe); }
+  .verdict.danger .vd-label { color: var(--danger); }
+  .vd-sub {
+    font-size: .75rem; color: var(--text-2);
+    font-family: var(--mono); margin-top: 4px;
+  }
+
+  /* sigmoid raw display */
+  .sigmoid-row {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex; justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .sigmoid-lbl { font-size: .75rem; color: var(--text-2); font-weight: 500; }
+  .sigmoid-val { font-family: var(--mono); font-size: .85rem; font-weight: 600; color: var(--accent); }
+
+  /* probability bars */
+  .prob-section { margin-bottom: 20px; }
+  .prob-title {
+    font-size: .7rem; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+  }
+  .prob-row { margin-bottom: 12px; }
+  .prob-top {
+    display: flex; justify-content: space-between;
+    font-size: .82rem; margin-bottom: 5px;
+  }
+  .prob-top .lbl { font-weight: 500; }
+  .prob-top .val { font-family: var(--mono); font-size: .75rem; font-weight: 600; }
+  .track {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 100px; height: 8px; overflow: hidden;
+  }
+  .fill {
+    height: 100%; border-radius: 100px;
+    transition: width 1s cubic-bezier(.4,0,.2,1);
+  }
+  .fill.safe   { background: linear-gradient(90deg, #059669, #10b981); }
+  .fill.danger { background: linear-gradient(90deg, #dc2626, #ef4444); }
+
+  /* meta */
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .meta-tag {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 3px 11px;
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+  }
+
+  /* ── HISTORY ── */
+  .history-section { margin-top: 20px; }
+  .hist-head {
+    font-size: .7rem; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .hist-clear {
+    background: none; border: none;
+    font-size: 11px; color: var(--muted); cursor: pointer; font-family: var(--sans);
+  }
+  .hist-list { display: flex; flex-direction: column; gap: 7px; }
+  .hist-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 13px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    animation: up .25s ease;
+    font-size: .82rem;
+  }
+  .hi-name {
+    font-weight: 500;
+    max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hi-badge {
+    font-size: .7rem; font-weight: 700; padding: 2px 9px;
+    border-radius: 100px;
+  }
+  .hi-badge.safe   { background: var(--safe-lt);   color: var(--safe); }
+  .hi-badge.danger { background: var(--danger-lt);  color: var(--danger); }
+  .hi-conf { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center; padding: 24px;
+    font-size: 11px; color: var(--muted);
+    font-family: var(--mono);
+    border-top: 1px solid var(--border);
+  }
+  footer span { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="brand">
+    🧠 Face Mask Detection
+    <span class="brand-pill">CNN</span>
+  </div>
+  <div class="model-chip">
+    <div class="pulse" id="statusDot"></div>
+    <span id="statusText">Initializing...</span>
+  </div>
+</header>
+
+<!-- PAGE -->
+<div class="page">
+
+  <!-- LEFT: INPUT CARD -->
+  <div class="card">
+    <div class="card-head">
+      <div class="ch-icon">📤</div>
+      <div>
+        <div class="ch-title">Upload Image</div>
+        <div class="ch-sub">Single image · Sigmoid binary classifier</div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <div class="drop-zone" id="dropZone">
+        <span class="dz-icon">🖼️</span>
+        <div class="dz-title">Drag &amp; drop or click to browse</div>
+        <div class="dz-sub">PNG · JPG · JPEG · BMP · WEBP</div>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+
+      <div class="preview-box" id="previewBox">
+        <img id="previewImg" src="" alt="Preview">
+        <div class="prev-overlay">
+          <button class="clear-btn" onclick="clearImg()">✕ Remove</button>
+        </div>
+      </div>
+
+      <div class="info-row" id="infoRow" style="display:none">
+        <div class="info-badge"><div class="dot"></div><span id="infoName">—</span></div>
+        <div class="info-badge">Resize: 100×100</div>
+        <div class="info-badge">Norm: [0,1]</div>
+      </div>
+
+      <div class="err-box" id="errBox"></div>
+
+      <button class="btn btn-primary" id="detectBtn" onclick="detect()" disabled>
+        🔍 Detect Mask
+      </button>
+      <button class="btn btn-ghost" onclick="downloadCSV()">
+        ⬇ Download CSV Log
+      </button>
+
+      <div class="spin-box" id="spinner">
+        <div class="spinner"></div>
+        Running inference on 100×100 input...
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: RESULT CARD -->
+  <div class="card">
+    <div class="card-head">
+      <div class="ch-icon">📊</div>
+      <div>
+        <div class="ch-title">Detection Result</div>
+        <div class="ch-sub">Sigmoid output + probability breakdown</div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <!-- placeholder -->
+      <div class="placeholder" id="placeholder">
+        <div class="ph-icon">🔬</div>
+        <div class="ph-title">Awaiting image input</div>
+        <div class="ph-sub">Upload an image and click Detect Mask</div>
+      </div>
+
+      <!-- result -->
+      <div class="result-box" id="resultBox">
+
+        <div class="verdict" id="verdictEl">
+          <div class="vd-icon" id="vdIcon"></div>
+          <div>
+            <div class="vd-label" id="vdLabel"></div>
+            <div class="vd-sub"   id="vdSub"></div>
+          </div>
+        </div>
+
+        <div class="sigmoid-row">
+          <span class="sigmoid-lbl">Raw Sigmoid Output</span>
+          <span class="sigmoid-val" id="rawSigmoid">—</span>
+        </div>
+
+        <div class="prob-section">
+          <div class="prob-title">Probability Breakdown</div>
+
+          <div class="prob-row">
+            <div class="prob-top">
+              <span class="lbl">✅ With Mask</span>
+              <span class="val" id="pWith">0%</span>
+            </div>
+            <div class="track"><div class="fill safe" id="barWith" style="width:0%"></div></div>
+          </div>
+
+          <div class="prob-row">
+            <div class="prob-top">
+              <span class="lbl">❌ Without Mask</span>
+              <span class="val" id="pWithout">0%</span>
+            </div>
+            <div class="track"><div class="fill danger" id="barWithout" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="meta-row" id="metaRow"></div>
+      </div>
+
+      <!-- session history -->
+      <div class="history-section" id="histSection" style="display:none">
+        <div class="hist-head">
+          Session History
+          <button class="hist-clear" onclick="clearHistory()">Clear</button>
+        </div>
+        <div class="hist-list" id="histList"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<footer>
+  Face Mask Detection System &nbsp;·&nbsp;
+  <span>TensorFlow / Keras</span> &nbsp;·&nbsp;
+  Custom CNN &nbsp;·&nbsp; 100×100 input &nbsp;·&nbsp;
+  Binary Crossentropy + Sigmoid
+</footer>
+
+<script>
+  /* ── STATUS ─────────────────────────────────────────────────────────────── */
+  async function checkStatus() {
+    try {
+      const r = await fetch('/api/status');
+      const d = await r.json();
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      if (d.model_loaded) {
+        dot.className = 'pulse on';
+        txt.textContent = `mask_detector.h5 · ${d.img_size}×${d.img_size} · ready`;
+      } else {
+        dot.className = 'pulse off';
+        txt.textContent = 'Model not found — run train.py';
+      }
+    } catch {
+      document.getElementById('statusDot').className = 'pulse off';
+      document.getElementById('statusText').textContent = 'Server offline';
+    }
+  }
+  checkStatus();
+
+  /* ── FILE INPUT ──────────────────────────────────────────────────────────── */
+  const fileInput  = document.getElementById('fileInput');
+  const dropZone   = document.getElementById('dropZone');
+  const previewBox = document.getElementById('previewBox');
+  const previewImg = document.getElementById('previewImg');
+  const detectBtn  = document.getElementById('detectBtn');
+
+  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+  ['dragover','dragenter'].forEach(e =>
+    dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('over'); }));
+  ['dragleave','dragend'].forEach(e =>
+    dropZone.addEventListener(e, () => dropZone.classList.remove('over')));
+  dropZone.addEventListener('drop', ev => {
+    ev.preventDefault(); dropZone.classList.remove('over');
+    const f = ev.dataTransfer.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); fileInput.files = dt.files; handleFile(f); }
+  });
+
+  function handleFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => { previewImg.src = e.target.result; previewBox.style.display = 'block'; };
+    reader.readAsDataURL(file);
+    document.getElementById('infoName').textContent = file.name;
+    document.getElementById('infoRow').style.display = 'flex';
+    detectBtn.disabled = false;
+    clearError(); hideResult();
+  }
+
+  function clearImg() {
+    fileInput.value = '';
+    previewBox.style.display = 'none';
+    previewImg.src = '';
+    document.getElementById('infoRow').style.display = 'none';
+    detectBtn.disabled = true;
+    clearError(); hideResult();
+  }
+
+  function hideResult() {
+    document.getElementById('resultBox').classList.remove('on');
+    document.getElementById('placeholder').style.display = 'block';
+  }
+  function clearError() {
+    const e = document.getElementById('errBox'); e.classList.remove('on'); e.textContent = '';
+  }
+  function showError(msg) {
+    const e = document.getElementById('errBox');
+    e.textContent = '⚠ ' + msg; e.classList.add('on');
+  }
+
+  /* ── DETECT ──────────────────────────────────────────────────────────────── */
+  let history = [];
+
+  async function detect() {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    clearError(); hideResult();
+    document.getElementById('spinner').classList.add('on');
+    detectBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      const r = await fetch('/api/predict', { method: 'POST', body: fd });
+      const d = await r.json();
+      document.getElementById('spinner').classList.remove('on');
+
+      if (!r.ok || d.error) { showError(d.error || 'Prediction failed'); detectBtn.disabled = false; return; }
+
+      renderResult(d);
+      pushHistory(d);
+      detectBtn.disabled = false;
+    } catch(err) {
+      document.getElementById('spinner').classList.remove('on');
+      showError('Server error: ' + err.message);
+      detectBtn.disabled = false;
+    }
+  }
+
+  function renderResult(d) {
+    const isMask = d.prediction === 'with_mask';
+
+    const vd = document.getElementById('verdictEl');
+    vd.className = 'verdict ' + (isMask ? 'safe' : 'danger');
+    document.getElementById('vdIcon').textContent  = isMask ? '✅' : '❌';
+    document.getElementById('vdLabel').textContent = isMask ? 'MASK DETECTED' : 'NO MASK DETECTED';
+    document.getElementById('vdSub').textContent   =
+      `${d.confidence}% confidence  ·  sigmoid: ${d.raw_sigmoid}  ·  ${d.timestamp}`;
+
+    document.getElementById('rawSigmoid').textContent = d.raw_sigmoid;
+    document.getElementById('pWith').textContent    = d.confidence_with_mask    + '%';
+    document.getElementById('pWithout').textContent = d.confidence_without_mask + '%';
+
+    setTimeout(() => {
+      document.getElementById('barWith').style.width    = d.confidence_with_mask    + '%';
+      document.getElementById('barWithout').style.width = d.confidence_without_mask + '%';
+    }, 40);
+
+    document.getElementById('metaRow').innerHTML =
+      `<span class="meta-tag">${d.filename}</span>
+       <span class="meta-tag">100×100 input</span>
+       <span class="meta-tag">sigmoid ≥ 0.5 → no mask</span>`;
+
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('resultBox').classList.add('on');
+  }
+
+  function pushHistory(d) {
+    const isMask = d.prediction === 'with_mask';
+    history.unshift({ name: d.filename, mask: isMask, conf: d.confidence });
+    if (history.length > 5) history.pop();
+
+    document.getElementById('histList').innerHTML = history.map(h =>
+      `<div class="hist-item">
+        <span class="hi-name" title="${h.name}">${h.name}</span>
+        <span class="hi-badge ${h.mask ? 'safe' : 'danger'}">${h.mask ? '✅ Mask' : '❌ No Mask'}</span>
+        <span class="hi-conf">${h.conf}%</span>
+      </div>`
+    ).join('');
+    document.getElementById('histSection').style.display = 'block';
+  }
+
+  function clearHistory() {
+    history = [];
+    document.getElementById('histList').innerHTML = '';
+    document.getElementById('histSection').style.display = 'none';
+  }
+
+  function downloadCSV() { window.location.href = '/api/download_csv'; }
+</script>
+</body>
+</html>
